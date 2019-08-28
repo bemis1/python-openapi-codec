@@ -134,12 +134,15 @@ def _get_parameters(link, encoding):
     """
     parameters = []
     properties = {}
+    examples = {}
     required = []
 
     for field in link.fields:
-        location = get_location(link, field)
-        field_description = _get_field_description(field)
-        field_type = _get_field_type(field)
+        location = openapi_codec.encode.get_location(link, field)
+        field_description = openapi_codec.encode._get_field_description(field)
+        field_type = openapi_codec.encode._get_field_type(field)
+        field_example = getattr(field, 'example', None)
+
         if location == 'form':
             if encoding in ('multipart/form-data', 'application/x-www-form-urlencoded'):
                 # 'formData' in swagger MUST be one of these media types.
@@ -164,6 +167,10 @@ def _get_parameters(link, encoding):
                 if field_type == 'array':
                     schema_property['items'] = {'type': 'string'}
                 properties[field.name] = schema_property
+
+                if field_example is not None:
+                    examples[field.name] = field_example
+
                 if field.required:
                     required.append(field.name)
         elif location == 'body':
@@ -193,13 +200,16 @@ def _get_parameters(link, encoding):
             parameters.append(parameter)
 
     if properties:
+        schema = {
+            'type': 'object',
+            'properties': properties
+        }
+        if examples:
+            schema['example'] = examples
         parameter = {
             'name': 'data',
             'in': 'body',
-            'schema': {
-                'type': 'object',
-                'properties': properties
-            }
+            'schema': schema
         }
         if required:
             parameter['schema']['required'] = required
